@@ -24,6 +24,7 @@ class MainCanvas extends GameCanvas implements Runnable {
 	private TiledLayer field = null;
 	private int score = 0;
 	private Graphics g;
+	private int gamemode = 0;
 	
 	/**
 	 * @throws IOException 
@@ -38,9 +39,10 @@ class MainCanvas extends GameCanvas implements Runnable {
 		
 		field = new TiledLayer(10, 15, image, 24, 20);
 		field.setPosition(0, -16);
-		field.fillCells(2, 1, 6, 12, 2); // MainField
+		field.fillCells(2, 1, 6, 12, 1); // MainField
 		field.fillCells(0, 0, 2, 15, 8); // Left Wall
 		field.fillCells(8, 0, 2, 15, 8); // Right Wall
+		field.fillCells(9, 1, 1, 4, 1);  // Next Puyo
 		field.fillCells(2, 0, 6, 1, 8);  // Upper Wall
 		field.fillCells(2, 13, 6, 2, 8); // Under Wall
 		
@@ -50,17 +52,15 @@ class MainCanvas extends GameCanvas implements Runnable {
 	}
 	
 	private void drawScore() {
-		g.setColor(0x000000);
-		g.fillRect(48, 250, 144, 18);
-		g.setColor(0xFFFFFF);
+		String scoreStr = Integer.toString(score); 
 		g.setFont(mediumFont);
-		g.drawString(Integer.toString(score), 120, 251, Graphics.TOP | Graphics.HCENTER);
+		g.setColor(0x000000);
+		g.drawString(scoreStr, 121, 252, Graphics.TOP | Graphics.HCENTER);
+		g.setColor(0xFFFFFF);
+		g.drawString(scoreStr, 120, 251, Graphics.TOP | Graphics.HCENTER);
 	}
 	
 	private void drawNextPuyo() {
-		
-		g.setColor(0x000000);
-		g.fillRect(216, 4, 24, 80);
 		
 		puyo.setFrame(2);
 		puyo.setPosition(216, 4);
@@ -75,7 +75,6 @@ class MainCanvas extends GameCanvas implements Runnable {
 		puyo.setFrame(5);
 		puyo.setPosition(230, 64);
 		puyo.paint(g);		
-
 	}
 	
 	public void run() {
@@ -85,9 +84,19 @@ class MainCanvas extends GameCanvas implements Runnable {
 		
 		field.paint(g);
 		
+		puyo.setFrame(1);
+		puyo.setPosition(144, 44);
+		puyo.paint(g);
+		
+		puyo.setFrame(4);
+		puyo.setPosition(144, 64);
+		puyo.paint(g);
+		
+		
 		drawNextPuyo();
 		drawScore();
 		
+		flushGraphics();
 	}
 
 }
