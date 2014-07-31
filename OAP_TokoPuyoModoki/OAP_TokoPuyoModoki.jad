@@ -1,5 +1,8 @@
-MIDlet-Name: 
-MIDlet-Vendor: 
+MIDlet-Name: とこぷよモドキ
+MIDlet-Vendor: Leonardone
 MIDlet-Version: 1.0
+MIDlet-1: とこぷよモドキ, , myapp.TokoPuyoModokiMIDlet
 MIDlet-Jar-URL: OAP_TokoPuyoModoki.jar
-MIDlet-Jar-Size: 249
+MIDlet-Jar-Size: 15177
+OAP-Screen-Size: QVGA
+MIDlet-Data-Size: 32768
