@@ -4,6 +4,7 @@
 package myapp;
 
 import java.io.IOException;
+import java.util.Random;
 
 import javax.microedition.lcdui.Font;
 import javax.microedition.lcdui.Graphics;
@@ -18,12 +19,17 @@ import javax.microedition.lcdui.game.TiledLayer;
  *
  */
 class MainCanvas extends GameCanvas implements Runnable {
-
+	
+	private Random rand;
+	
 	private Sprite puyoSprite = null;
 	private TiledLayer fieldTLayer = null;
 	private Graphics g;
 	private int[] field;
-
+	private int[] anime;
+	private int[] eFlags;
+	private int[] eFlagCount;
+	
 	private int[] ranking;
 
 	private int gamemode = 0;
@@ -35,6 +41,8 @@ class MainCanvas extends GameCanvas implements Runnable {
 	private int drop2c = 2;
 	private int drop2x = 0;
 	private int drop2y = -1;
+	
+	private int spindle = 2;
 	
 	private int next1 = 1;
 	private int next2 = 2;
@@ -50,6 +58,8 @@ class MainCanvas extends GameCanvas implements Runnable {
 	public MainCanvas() throws IOException {
 		super(false);
 		
+		rand = new Random();
+		
 		Image image = Image.createImage("/puyo.png");
 		
 		puyoSprite = new Sprite(image, 24, 20);
@@ -63,9 +73,16 @@ class MainCanvas extends GameCanvas implements Runnable {
 		fieldTLayer.fillCells(2, 0, 6, 1, 8);  // Upper Wall
 		fieldTLayer.fillCells(2, 13, 6, 2, 8); // Under Wall
 		
+		anime = new int[6];
+		for (int i = 0; i < 6; i++) {
+			anime[i] = fieldTLayer.createAnimatedTile(i + 9);
+		}
+		
 		score = 0; // Test
 		ranking = new int[10];
 		field = new int[128];
+		eFlags = new int[128];
+		eFlagCount = new int[128];
 		
 		for (int i = 0; i < 8; i++) {
 			field[i] = field[i + 120] = -1;
@@ -108,26 +125,45 @@ class MainCanvas extends GameCanvas implements Runnable {
 		g.drawString("RANKING", 120, 4, Graphics.TOP | Graphics.HCENTER);
 		
 		for (int i = 0; i < ranking.length; i++) {
-			g.drawString(" 1 2 3 4 5 6 7 8 910".substring(i << 1, (i + 1) << 1)
+			g.drawSubstring(" 1 2 3 4 5 6 7 8 910", i << 1, (i + 1) << 1
 					, 72, 24 + i * 20, Graphics.TOP | Graphics.RIGHT);
 			g.drawString(Integer.toString(ranking[i]), 180, 24 + i * 20, Graphics.TOP | Graphics.RIGHT);
 		}
 	}
 	
 	private void drawDropPuyo() {
+		int x, y;
 		
 		if (drop1y >= 0) {
+			x = drop1x * 24 + 48;
+			y = drop1y * 20 + 4;
+			
 			puyoSprite.setFrame(drop1c);
-			puyoSprite.setPosition(drop1x * 24 + 48, drop1y * 20 + 4);
+			puyoSprite.setPosition(x, y);
 			puyoSprite.paint(g);
+			
+			if (spindle == 1 && (dropCount & 0x1) == 0) {
+				g.setColor(0x777733);
+				g.drawRect(x, y, 24, 20);
+			}
+			
 		}
 		
 		if (drop2y >= 0) {
+			x = drop2x * 24 + 48;
+			y = drop2y * 20 + 4;
+			
 			puyoSprite.setFrame(drop2c);
-			puyoSprite.setPosition(drop2x * 24 + 48, drop2y * 20 + 4);
+			puyoSprite.setPosition(x, y);
 			puyoSprite.paint(g);
+			
+			if (spindle == 2 && (dropCount & 0x1) == 0) {
+				g.setColor(0x777733);
+				g.drawRect(x, y, 24, 20);
+			}
+			
 		}
-				
+		
 	}
 	
 	private boolean movePuyo(int dx, int dy) {
@@ -147,27 +183,22 @@ class MainCanvas extends GameCanvas implements Runnable {
 	private boolean checkPlayKey(int keyState) {
 		switch (keyState) {
 		case LEFT_PRESSED:
-			movePuyo(-1, 0);
-			break;
+			return movePuyo(-1, 0);
 		case RIGHT_PRESSED:
-			movePuyo(1, 0);
-			break;
+			return movePuyo(1, 0);
 		case DOWN_PRESSED:
-			movePuyo(0, 1);
-			break;
+			return movePuyo(0, 1);
 		case UP_PRESSED: // Rotate Left
 			break;
 		case FIRE_PRESSED: // Rotate Right
 			break;
-		default:
-			return false;
 		}
-		return true;
+		return false;
 	}
 	
 	private void checkDrop() {
 		dropCount++;
-		if (dropCount > 12) {
+		if (dropCount > 6) {
 			dropCount = 0;
 			if (movePuyo(0, 1) == false) {
 				gamemode = 4;
@@ -184,23 +215,71 @@ class MainCanvas extends GameCanvas implements Runnable {
 		fieldTLayer.setCell(drop2x + 2, drop2y + 1, drop2c + 1);
 	}
 	
+	private boolean checkAllDrops() {
+		int drops = 0;
+		for (int i = 120; i > 8; i--) {
+			if (field[i] == 0 && field[i - 8] > 0) {
+				drops++;
+				field[i] = field[i - 8];
+				field[i - 8] = 0;
+			}
+		}
+		
+		return drops > 0;
+	}
+	
+	private boolean checkErasePuyo() {
+		
+		return false;
+	}
+	
+	private void initGame() {
+		score = 0;
+	}
+	
+	private void setNextPuyo() {
+		drop1c = next1;
+		drop1x = 2;
+		drop1y = -2;
+		
+		drop2c = next2;
+		drop2x = 2;
+		drop2y = -1;
+		
+		spindle = 2;
+		
+		next1 = next3;
+		next2 = next4;
+		
+		next3 = rand.nextInt(5) + 1;
+		next4 = rand.nextInt(5) + 1;
+		
+	}
+	
 	public void run() {
 		g = getGraphics();
 		
 		g.setFont(Font.getFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
-		
+	
+		next1 = rand.nextInt(5) + 1;
+		next2 = rand.nextInt(5) + 1;
+		next3 = rand.nextInt(5) + 1;
+		next4 = rand.nextInt(5) + 1;
+
 		gamemode = 0;
 		int keyState;
 		long wait0, wait1;
 		
 		for(;;) {
-			wait0 = System.currentTimeMillis();
+			wait0 = System.currentTimeMillis() + 120L; // add Wait count
 			
 			keyState = getKeyStates();
 			
 			switch (gamemode) {
 			case 0: // Title
 				if (keyState == FIRE_PRESSED) {
+					initGame();
+					setNextPuyo();
 					gamemode = 3;
 				}
 				break;
@@ -226,8 +305,15 @@ class MainCanvas extends GameCanvas implements Runnable {
 					gamemode = 3;
 				} else {
 					droped();
-					gamemode = 5;
+					gamemode = 6;
 				}
+				break;
+			case 5: // 
+				if (checkAllDrops() == false) {
+					gamemode = 6;
+				}
+				break;
+			case 6:
 				break;
 			}
 		
@@ -258,9 +344,12 @@ class MainCanvas extends GameCanvas implements Runnable {
 			
 			// Wait
 			do {
-				wait1 = System.currentTimeMillis() - wait0;
-			} while (wait1 < 100L);
+				wait1 = System.currentTimeMillis();
+			} while (wait1 < wait0);
 			
+			g.setColor(0xFFFFFF);
+			g.drawString(Long.toString(wait1 - wait0), 0, 0, Graphics.TOP | Graphics.LEFT);
+			flushGraphics();
 		}
 	}
 }
