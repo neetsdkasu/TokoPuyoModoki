@@ -1010,12 +1010,14 @@ class MainCanvas extends GameCanvas implements Runnable {
 				wait1 = System.currentTimeMillis();
 			} while (wait1 < wait0);
 			
+			/*
 			String num = Long.toString(wait1 -wait0);
 			g.setColor(0xFFFFFF);
 			g.fillRect(0, 0, 48, 20);
 			g.setColor(0x000000);
 			g.drawString(num, 0, 0, Graphics.TOP | Graphics.LEFT);
 			flushGraphics();
+			*/
 		}
 	}
 }
