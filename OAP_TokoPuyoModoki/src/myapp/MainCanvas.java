@@ -782,6 +782,33 @@ class MainCanvas extends GameCanvas implements Runnable {
 		animeterm++;
 		fieldTLayer.paint(g);
 		drawScore();
+		if (chain > 1) {
+			String mes = Integer.toString(chain - 1).concat(" CHAINS!");
+			g.setColor(0xFFFFFF);
+			g.drawString(mes, 121, 60, Graphics.TOP | Graphics.HCENTER);
+			g.drawString(mes, 120, 61, Graphics.TOP | Graphics.HCENTER);
+			g.drawString(mes, 119, 60, Graphics.TOP | Graphics.HCENTER);
+			g.drawString(mes, 120, 59, Graphics.TOP | Graphics.HCENTER);
+			g.drawString(mes, 121, 61, Graphics.TOP | Graphics.HCENTER);
+			g.drawString(mes, 119, 61, Graphics.TOP | Graphics.HCENTER);
+			g.drawString(mes, 121, 59, Graphics.TOP | Graphics.HCENTER);
+			g.drawString(mes, 119, 59, Graphics.TOP | Graphics.HCENTER);
+			switch (chain) {
+			case 2:
+				g.setColor(0x000000);
+				break;
+			case 3:
+				g.setColor(0x0000FF);
+				break;
+			case 4:
+				g.setColor(0x00FF00);
+				break;
+			default:
+				g.setColor(0xFF0000);
+				break;
+			}
+			g.drawString(mes, 120, 60, Graphics.TOP | Graphics.HCENTER);
+		}
 		flushGraphics(48, 4, 144, 264);
 	}
 	
