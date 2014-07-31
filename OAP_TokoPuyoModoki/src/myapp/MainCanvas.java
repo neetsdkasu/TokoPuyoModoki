@@ -3,17 +3,24 @@
  */
 package myapp;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Random;
 
 import javax.microedition.lcdui.Font;
 import javax.microedition.lcdui.Graphics;
 import javax.microedition.lcdui.Image;
-import javax.microedition.lcdui.ItemCommandListener;
-import javax.microedition.lcdui.TextField;
 import javax.microedition.lcdui.game.GameCanvas;
 import javax.microedition.lcdui.game.Sprite;
 import javax.microedition.lcdui.game.TiledLayer;
+import javax.microedition.rms.RecordEnumeration;
+import javax.microedition.rms.RecordStore;
+import javax.microedition.rms.RecordStoreException;
+import javax.microedition.rms.RecordStoreFullException;
+import javax.microedition.rms.RecordStoreNotFoundException;
 
 /**
  * @author Leonardone
@@ -30,6 +37,7 @@ class MainCanvas extends GameCanvas implements Runnable {
 	private static final int MODE_CHKERASE = 6;
 	private static final int MODE_CHKGAMEOVER = 7;
 	private static final int MODE_ERASEANIME = 8;
+	private static final int MODE_GAMEOVERANIME = 9;
 	
 	private Random rand;
 	
@@ -47,10 +55,14 @@ class MainCanvas extends GameCanvas implements Runnable {
 	private int[] eFlags;
 	private int[] eFlagCount;
 	
+	private int chain;
+	private int basepoint;
+	
 	private int[] ranking;
 
 	private int gamemode = 0;
 	private int score = 0;
+	private int rank;
 
 	private int drop1c = 1;
 	private int drop1x = 0;
@@ -73,6 +85,9 @@ class MainCanvas extends GameCanvas implements Runnable {
 	private int next4 = 4;
 	
 	private int dropCount = 0;
+	
+	private int gamespeed = 3;
+	private long gamewait = 80L;
 
 	/**
 	 * @throws IOException 
@@ -144,12 +159,135 @@ class MainCanvas extends GameCanvas implements Runnable {
 		puyoSprite.paint(g);		
 	}
 	
+	private void loadScore() {
+		ByteArrayInputStream bin = null;
+		DataInputStream din = null;
+		RecordStore res = null;
+		RecordEnumeration re = null;
+		int i;
+		try {
+			String[] names = RecordStore.listRecordStores();
+			if (names == null) {
+				return;
+			}
+			for (i = 0; i < names.length; i++) {
+				if ("HISCORE".equals(names[i])) {
+					break;
+				}
+			}
+			if (i == names.length) {
+				return;
+			}
+			names = null;
+			
+			res = RecordStore.openRecordStore("HISCORE", false);
+			re = res.enumerateRecords(null, null, true);
+			if (re.hasNextElement()) {
+				byte[] data = re.nextRecord();
+				if (data.length < 40) {
+					return;
+				}
+				bin = new ByteArrayInputStream(data);
+			} else {
+				return;
+			}
+			re.destroy();
+			re = null;
+			din = new DataInputStream(bin);
+			for (i = 0; i < 10; i++) {
+				ranking[i] = din.readInt();
+			}
+			
+		} catch (Exception e) {
+		} finally {
+			if (re != null) {
+				re.destroy();
+				re = null;
+			}
+			if (res != null) {
+				try {
+					res.closeRecordStore();
+				} catch (Exception e) {
+				}
+			}
+			if (din != null) {
+				try {
+					din.close();
+				} catch (Exception e) {
+				}
+			} else if (bin != null) {
+				try {
+					bin.close();
+				} catch (Exception e) {
+				}
+			}
+		}
+	}
+	
+	private void saveScore() {
+		ByteArrayOutputStream bos = null;
+		DataOutputStream dos = null;
+		RecordStore res = null;
+		RecordEnumeration re = null;
+		try {
+			bos = new ByteArrayOutputStream(40);
+			dos = new DataOutputStream(bos);
+			for (int i = 0; i < 10; i++) {
+				dos.writeInt(ranking[i]);
+			}
+			dos.flush();
+			res = RecordStore.openRecordStore("HISCORE", true);
+			if (res.getNumRecords() == 0) {
+				res.addRecord(bos.toByteArray(), 0, bos.size());
+			} else {
+				int id = 0;
+				re = res.enumerateRecords(null, null, true);
+				if (re.hasNextElement()) {
+					id = re.nextRecordId();
+				} else {
+					return;
+				}
+				re.destroy();
+				re = null;
+				res.setRecord(id, bos.toByteArray(), 0, bos.size());
+			}
+					
+		} catch (Exception e) {
+		} finally {
+			if (re != null) {
+				re.destroy();
+				re = null;
+			}
+			if (res != null) {
+				try {
+					res.closeRecordStore();
+				} catch (Exception e) {
+				}
+			}
+			if (dos != null) {
+				try {
+					dos.close();
+				} catch (Exception e) {
+				}
+			} else if (bos != null) {
+				try {
+					bos.close();
+				} catch (Exception e){
+				}
+			}
+		}
+	}
+	
 	private void drawRanking() {
-		g.setColor(0xFFFFFF);
-		
+		g.setColor(0xFFFFFF);				
 		g.drawString("RANKING", 120, 4, Graphics.TOP | Graphics.HCENTER);
 		
 		for (int i = 0; i < ranking.length; i++) {
+			if (rank == i) {
+				g.setColor(0x22FFEE);
+			} else {
+				g.setColor(0xFFFFFF);				
+			}
 			g.drawSubstring(" 1 2 3 4 5 6 7 8 910", i << 1, 2
 					, 72, 24 + i * 20, Graphics.TOP | Graphics.RIGHT);
 			g.drawString(Integer.toString(ranking[i]), 180, 24 + i * 20, Graphics.TOP | Graphics.RIGHT);
@@ -355,13 +493,17 @@ class MainCanvas extends GameCanvas implements Runnable {
 			return rotate(false);
 		case FIRE_PRESSED: // Rotate Right
 			return rotate(true);
+		case GAME_C_PRESSED:
+			spindle = 3 - spindle;
+			rotation = (rotation + 2) & 0x3;
+			break;
 		}
 		return false;
 	}
 	
 	private boolean landing() {
 		dropCount++;
-		if (dropCount > 6) {
+		if (dropCount > gamespeed ) {
 			dropCount = 0;
 			if (movePuyo(0, 1) == false) {
 				return true;
@@ -442,11 +584,19 @@ class MainCanvas extends GameCanvas implements Runnable {
 			}
 		}
 		
+		basepoint = 0;
+		for (int i = 1; i <= eFlagID; i++) {
+			if (eFlagCount[i] > 3) {
+				basepoint += eFlagCount[i];
+			}
+		}
+		
 		return count > 0;
 	}
 	
 	private void initGame() {
 		score = 0;
+		rank = 0;
 		
 		for (int i = 8; i < 120; i++) {
 			if (field[i] > 0) {
@@ -467,6 +617,8 @@ class MainCanvas extends GameCanvas implements Runnable {
 	}
 	
 	private void setNextPuyo() {
+		chain = 0;
+		
 		drop1c = next1;
 		drop1x = 2;
 		drop1y = -2;
@@ -507,6 +659,20 @@ class MainCanvas extends GameCanvas implements Runnable {
 	
 	private void switchRanking() {
 		gamemode = MODE_RANKING;
+		rank = -1;
+		for (int i = 0; i < 10; i++) {
+			if (score > ranking[i]) {
+				rank = i;
+				for (int j = 9; j > i; j--) {
+					ranking[j] = ranking[j - 1];
+				}
+				ranking[i] = score;
+				break;
+			}
+		}
+		if (rank >= 0) {
+			saveScore();
+		}
 		g.setColor(0x000000);
 		g.fillRect(48, 4, 144, 264);
 		drawRanking();
@@ -529,6 +695,7 @@ class MainCanvas extends GameCanvas implements Runnable {
 	private void switchEraseAnime() {
 		int d, x, y;
 		gamemode = MODE_ERASEANIME;
+		chain++;
 		animeterm = 0;
 		for (int i = 0; i < 6; i++) {
 			fieldTLayer.setAnimatedTile(anime[i], i + 9);
@@ -549,6 +716,76 @@ class MainCanvas extends GameCanvas implements Runnable {
 		flushGraphics(48, 8, 144, 264);
 	}
 	
+	private void animateErase() {
+		switch (animeterm) {
+		case 0:
+			for (int i = 0; i < 6; i++) {
+				fieldTLayer.setAnimatedTile(anime[i], i + 16);
+			}
+			break;
+		case 1:
+			for (int i = 0; i < 6; i++) {
+				fieldTLayer.setAnimatedTile(anime[i], 15);
+			}
+			break;
+		case 2:
+			for (int i = 24; i < 120; i++) {
+				if (field[i] == 0 && eFlags[i] != 0) {
+					int x = (i & 0x7) - 1;
+					int y = (i >> 3) - 3;
+					fieldTLayer.setCell(x, y, 1);
+				}
+			}
+			break;
+		default:
+			score += (basepoint + chain - 4) * chain * 10;
+			switchDrop();
+			break;
+		}
+		animeterm++;
+		fieldTLayer.paint(g);
+		drawScore();
+		flushGraphics(48, 4, 144, 264);
+	}
+	
+	private void switchGameOverAnime() {
+		gamemode = MODE_GAMEOVERANIME;
+		animeterm = 0;
+	}
+	
+	private void animateGameOver() {
+		int st, ed;
+		switch (animeterm) {
+		case 0:
+			st = 2;
+			ed = 3;
+			break;
+		case 1:
+			st = 1;
+			ed = 4;
+			break;
+		case 2:
+			st = 0;
+			ed = 5;
+			break;
+		default:
+			st = 0;
+			ed = 6;
+			break;
+		}
+		for (int j = st; j < ed; j++) {
+			for (int i = 13; i > 1; i--) {
+				fieldTLayer.setCell(j, i, fieldTLayer.getCell(j, i - 2));
+			}
+			fieldTLayer.setCell(j, 0, 1);
+			fieldTLayer.setCell(j, 1, 1);
+		}
+		animeterm++;
+		fieldTLayer.paint(g);
+		drawScore();
+		flushGraphics(48, 4, 144, 264);
+	}
+	
 	public void run() {
 		g = getGraphics();
 		
@@ -556,6 +793,8 @@ class MainCanvas extends GameCanvas implements Runnable {
 		g.fillRect(0, 0, 240, 268);
 		wallTLayer.paint(g);
 		flushGraphics();
+		
+		loadScore();
 		
 		g.setFont(Font.getFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
 	
@@ -570,7 +809,7 @@ class MainCanvas extends GameCanvas implements Runnable {
 		switchTitle();
 		
 		for(;;) {
-			wait0 = System.currentTimeMillis() + 50L; // add Wait count
+			wait0 = System.currentTimeMillis() + gamewait; // add Wait count
 			
 			keyState = getKeyStates();
 			
@@ -625,40 +864,21 @@ class MainCanvas extends GameCanvas implements Runnable {
 				break;
 			case MODE_CHKGAMEOVER:
 				if (field[p2i(2, 0)] != 0) {
-					switchGameOver();
+					switchGameOverAnime();
 				} else {
 					switchNextPuyo();
 				}
 				break;
 			case MODE_ERASEANIME:
-				switch (animeterm) {
-				case 0:
-					for (int i = 0; i < 6; i++) {
-						fieldTLayer.setAnimatedTile(anime[i], i + 16);
-					}
-					break;
-				case 1:
-					for (int i = 0; i < 6; i++) {
-						fieldTLayer.setAnimatedTile(anime[i], 15);
-					}
-					break;
-				case 2:
-					for (int i = 24; i < 120; i++) {
-						if (field[i] == 0 && eFlags[i] != 0) {
-							int x = (i & 0x7) - 1;
-							int y = (i >> 3) - 3;
-							fieldTLayer.setCell(x, y, 1);
-						}
-					}
-					break;
-				default:
-					switchDrop();
-					break;
+				animateErase();
+
+				break;
+				
+			case MODE_GAMEOVERANIME:
+				animateGameOver();
+				if (animeterm > 10) {
+					switchGameOver();
 				}
-				animeterm++;
-				fieldTLayer.paint(g);
-				drawScore();
-				flushGraphics(48, 4, 144, 264);
 				break;
 			}
 			
