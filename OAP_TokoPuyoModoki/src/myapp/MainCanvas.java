@@ -27,8 +27,9 @@ class MainCanvas extends GameCanvas implements Runnable {
 	private static final int MODE_NEXTPUYO = 3;
 	private static final int MODE_PLAYING = 4;
 	private static final int MODE_DROP = 5;
-	private static final int MODE_ERASE = 6;
+	private static final int MODE_CHKERASE = 6;
 	private static final int MODE_CHKGAMEOVER = 7;
+	private static final int MODE_ERASEANIME = 8;
 	
 	private Random rand;
 	
@@ -37,7 +38,12 @@ class MainCanvas extends GameCanvas implements Runnable {
 	private TiledLayer wallTLayer;
 	private Graphics g;
 	private int[] field;
+	
 	private int[] anime;
+	private int animeterm;
+	
+	private int eFlagCl;
+	private int eFlagID;
 	private int[] eFlags;
 	private int[] eFlagCount;
 	
@@ -404,9 +410,39 @@ class MainCanvas extends GameCanvas implements Runnable {
 		return drops > 0;
 	}
 	
+	private void seek(int d) {
+		if (d < 24 || field[d] != eFlagCl || eFlags[d] != 0) {
+			return;
+		}
+		eFlags[d] = eFlagID;
+		eFlagCount[eFlagID]++;
+		seek(d - 8);
+		seek(d + 8);
+		seek(d - 1);
+		seek(d + 1);
+	}
+	
 	private boolean checkErasePuyo() {
+		int count = 0;
 		
-		return false;
+		eFlagID = 0;
+		for (int i = 0; i < 128; i++) {
+			eFlags[i] = 0;
+			eFlagCount[i] = 0;
+		}
+		
+		for (int i = 24; i < 120; i++) {
+			if (field[i] > 0 && eFlags[i] == 0) {
+				eFlagID++;
+				eFlagCl = field[i];
+				seek(i);
+				if (eFlagCount[eFlagID] > 3) {
+					count++;
+				}
+			}
+		}
+		
+		return count > 0;
 	}
 	
 	private void initGame() {
@@ -490,6 +526,29 @@ class MainCanvas extends GameCanvas implements Runnable {
 		gamemode = MODE_DROP;
 	}
 	
+	private void switchEraseAnime() {
+		int d, x, y;
+		gamemode = MODE_ERASEANIME;
+		animeterm = 0;
+		for (int i = 0; i < 6; i++) {
+			fieldTLayer.setAnimatedTile(anime[i], i + 9);
+		}
+		
+		for (int i = 8; i < 120; i++) {
+			d = eFlags[i];
+			if (d > 0 && eFlagCount[d] > 3) {
+				x = (i & 0x7) - 1;
+				y = (i >> 3) - 3;
+				fieldTLayer.setCell(x, y, anime[field[i] - 1]);
+				field[i] = 0;
+			}
+		}
+		
+		fieldTLayer.paint(g);
+		drawScore();
+		flushGraphics(48, 8, 144, 264);
+	}
+	
 	public void run() {
 		g = getGraphics();
 		
@@ -554,11 +613,15 @@ class MainCanvas extends GameCanvas implements Runnable {
 					drawScore();
 					flushGraphics(48, 4, 144, 264);
 				} else {
-					gamemode = MODE_ERASE;
-					gamemode = MODE_CHKGAMEOVER; // test
+					gamemode = MODE_CHKERASE;
 				}
 				break;
-			case MODE_ERASE:
+			case MODE_CHKERASE:
+				if (checkErasePuyo()) {
+					switchEraseAnime();
+				} else {
+					gamemode = MODE_CHKGAMEOVER;
+				}
 				break;
 			case MODE_CHKGAMEOVER:
 				if (field[p2i(2, 0)] != 0) {
@@ -566,6 +629,36 @@ class MainCanvas extends GameCanvas implements Runnable {
 				} else {
 					switchNextPuyo();
 				}
+				break;
+			case MODE_ERASEANIME:
+				switch (animeterm) {
+				case 0:
+					for (int i = 0; i < 6; i++) {
+						fieldTLayer.setAnimatedTile(anime[i], i + 16);
+					}
+					break;
+				case 1:
+					for (int i = 0; i < 6; i++) {
+						fieldTLayer.setAnimatedTile(anime[i], 15);
+					}
+					break;
+				case 2:
+					for (int i = 24; i < 120; i++) {
+						if (field[i] == 0 && eFlags[i] != 0) {
+							int x = (i & 0x7) - 1;
+							int y = (i >> 3) - 3;
+							fieldTLayer.setCell(x, y, 1);
+						}
+					}
+					break;
+				default:
+					switchDrop();
+					break;
+				}
+				animeterm++;
+				fieldTLayer.paint(g);
+				drawScore();
+				flushGraphics(48, 4, 144, 264);
 				break;
 			}
 			
