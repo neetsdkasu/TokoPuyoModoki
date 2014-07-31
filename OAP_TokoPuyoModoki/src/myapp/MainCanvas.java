@@ -8,6 +8,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Random;
 
 import javax.microedition.lcdui.Font;
@@ -16,6 +17,9 @@ import javax.microedition.lcdui.Image;
 import javax.microedition.lcdui.game.GameCanvas;
 import javax.microedition.lcdui.game.Sprite;
 import javax.microedition.lcdui.game.TiledLayer;
+import javax.microedition.media.Manager;
+import javax.microedition.media.MediaException;
+import javax.microedition.media.Player;
 import javax.microedition.rms.RecordEnumeration;
 import javax.microedition.rms.RecordStore;
 import javax.microedition.rms.RecordStoreException;
@@ -40,6 +44,12 @@ class MainCanvas extends GameCanvas implements Runnable {
 	private static final int MODE_GAMEOVERANIME = 9;
 	
 	private Random rand;
+	
+	private Player seMove = null;
+	private Player seDrop = null;
+	private Player seErase = null;
+	private Player seGameOver = null;
+	private Player seAny = null;
 	
 	private Sprite puyoSprite;
 	private TiledLayer fieldTLayer;
@@ -132,6 +142,21 @@ class MainCanvas extends GameCanvas implements Runnable {
 			field[i] = field[i + 7] = -1;
 		}
 		
+	}
+	
+	public void release() {
+		if (seMove != null) {
+			seMove.close();
+		}
+		if (seDrop != null) {
+			seDrop.close();
+		}
+		if (seGameOver != null) {
+			seGameOver.close();
+		}
+		if (seErase != null) {
+			seErase.close();
+		}
 	}
 	
 	private void drawScore() {
@@ -595,6 +620,13 @@ class MainCanvas extends GameCanvas implements Runnable {
 	}
 	
 	private void initGame() {
+		
+		seGameOver.deallocate();
+		try {
+			seErase.prefetch();
+		} catch (MediaException e) {
+		}
+		
 		score = 0;
 		rank = 0;
 		
@@ -722,6 +754,11 @@ class MainCanvas extends GameCanvas implements Runnable {
 			for (int i = 0; i < 6; i++) {
 				fieldTLayer.setAnimatedTile(anime[i], i + 16);
 			}
+			try {
+				seErase.setMediaTime(0L);
+				seErase.start();
+			} catch (Exception e) {
+			}
 			break;
 		case 1:
 			for (int i = 0; i < 6; i++) {
@@ -751,6 +788,11 @@ class MainCanvas extends GameCanvas implements Runnable {
 	private void switchGameOverAnime() {
 		gamemode = MODE_GAMEOVERANIME;
 		animeterm = 0;
+		seErase.deallocate();
+		try {
+			seGameOver.prefetch();
+		} catch (Exception e) {
+		}
 	}
 	
 	private void animateGameOver() {
@@ -759,6 +801,11 @@ class MainCanvas extends GameCanvas implements Runnable {
 		case 0:
 			st = 2;
 			ed = 3;
+			try {
+				seGameOver.setMediaTime(0L);
+				seGameOver.start();
+			} catch (Exception e) {
+			}
 			break;
 		case 1:
 			st = 1;
@@ -786,6 +833,39 @@ class MainCanvas extends GameCanvas implements Runnable {
 		flushGraphics(48, 4, 144, 264);
 	}
 	
+	private void loadSounds() {
+		InputStream in = null;
+		try {
+			Class loader = getClass();
+			
+			in = loader.getResourceAsStream("/move.mid");
+			seMove = Manager.createPlayer(in, "audio/midi");
+			
+			in = loader.getResourceAsStream("/drop.mid");
+			seDrop = Manager.createPlayer(in, "audio/midi");
+			
+			in = loader.getResourceAsStream("/gameover.mid");
+			seGameOver = Manager.createPlayer(in, "audio/midi");
+			
+			in = loader.getResourceAsStream("/erase.mid");
+			seErase = Manager.createPlayer(in, "audio/midi");
+			
+			seMove.prefetch();
+			seDrop.prefetch();
+			seGameOver.realize();
+			seErase.realize();
+			
+		} catch (Exception e) {
+		} finally {
+			if (in != null) {
+				try {
+					in.close();
+				} catch (Exception e) {
+				}
+			}
+		}
+	}
+	
 	public void run() {
 		g = getGraphics();
 		
@@ -795,6 +875,7 @@ class MainCanvas extends GameCanvas implements Runnable {
 		flushGraphics();
 		
 		loadScore();
+		loadSounds();
 		
 		g.setFont(Font.getFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
 	
@@ -839,8 +920,18 @@ class MainCanvas extends GameCanvas implements Runnable {
 			case MODE_PLAYING: // Playing
 				if (operate(keyState)) {
 					drawDropPuyo();
+					try {
+						seMove.setMediaTime(0L);
+						seMove.start();
+					} catch (Exception e) {
+					}
 				} else if (landing()) {
 					landed();
+					try {
+						seDrop.setMediaTime(0L);
+						seDrop.start();
+					} catch (Exception e) {
+					}
 					switchDrop();
 				} else {
 					drawDropPuyo();
@@ -851,6 +942,11 @@ class MainCanvas extends GameCanvas implements Runnable {
 					fieldTLayer.paint(g);
 					drawScore();
 					flushGraphics(48, 4, 144, 264);
+					try {
+						seDrop.setMediaTime(0L);
+						seDrop.start();
+					} catch (Exception e) {
+					}
 				} else {
 					gamemode = MODE_CHKERASE;
 				}

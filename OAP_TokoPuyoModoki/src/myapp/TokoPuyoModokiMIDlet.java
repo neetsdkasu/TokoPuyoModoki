@@ -51,7 +51,9 @@ public class TokoPuyoModokiMIDlet extends MIDlet implements CommandListener {
 	 */
 	protected void destroyApp(boolean unconditional)
 			throws MIDletStateChangeException {
-
+		if (canvas != null) {
+			canvas.release();
+		}
 	}
 
 	/* (”ñ Javadoc)
@@ -73,6 +75,9 @@ public class TokoPuyoModokiMIDlet extends MIDlet implements CommandListener {
 
 	public void commandAction(Command c, Displayable d) {
 		if (c.equals(exitCommand) || c.equals(Alert.DISMISS_COMMAND)) {
+			if (canvas != null) {
+				canvas.release();
+			}
 			notifyDestroyed();
 		}
 	}
