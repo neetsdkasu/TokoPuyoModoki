@@ -911,7 +911,7 @@ class MainCanvas extends GameCanvas implements Runnable {
 		next3 = rand.nextInt(5) + 1;
 		next4 = rand.nextInt(5) + 1;
 
-		int keyState;
+		int keyState, lastKeyState = 0;
 		long wait0, wait1;
 		
 		switchTitle();
@@ -920,6 +920,10 @@ class MainCanvas extends GameCanvas implements Runnable {
 			wait0 = System.currentTimeMillis() + gamewait; // add Wait count
 			
 			keyState = getKeyStates();
+			if (keyState == lastKeyState) {
+				keyState = 0;
+			}
+			lastKeyState = keyState;
 			
 			switch (gamemode) {
 			case MODE_TITLE: // Title
