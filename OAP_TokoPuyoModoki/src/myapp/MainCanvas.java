@@ -986,6 +986,11 @@ class MainCanvas extends GameCanvas implements Runnable {
 				if (checkErasePuyo()) {
 					switchEraseAnime();
 				} else {
+					if (chain > 1) {
+						fieldTLayer.paint(g);
+						drawScore();
+						flushGraphics(48, 4, 144, 264);
+					}
 					gamemode = MODE_CHKGAMEOVER;
 				}
 				break;
